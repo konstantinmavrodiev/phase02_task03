@@ -1,11 +1,58 @@
 version: "3.9"
 services:
-  wordpress:
-    # Here you put configuration of continer for Load balancer that would handle traffic to wordpress. Ports of webserver should be exposed to lacalhost
-    #...
-  wordpress:
-    # Here you put configuration of continer for wordpress that would use image that you build.
-    # ...
   database:
     # Here you put configuration of continer for MySQL that would use any mysql image you like
     #...
+    image: mysql:5.7
+    container_name: db
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MYSQL_DATABASE=wordpress
+    networks: 
+      - app-network
+
+  wordpress:
+    # Here you put configuration of container for wordpress that would use image that you build. Ports of webserver should be exposed to lacalhost
+    build: .
+    ### image will be auto generated with above command
+    depends_on: 
+      - database
+    ports:
+      - "80:8000" # exposing port 80 of WP to port 8000 of the hosting machine
+    container_name: wordpress
+    restart: always
+    env_file: .env
+    environment: 
+      - WORDPRESS_DB_HOST=db:3306
+      - WORDPRESS_DB_USER=$MYSQL_USER
+      - WORDPRESS_DB_PASSWORD=$MYSQL_PASSWORD
+      - WORDPRESS_DB_NAME=wordpress
+    volumes: 
+      - wordpress:/var/www/app/wordpress
+    networks: 
+      - app-network
+
+  webserver:
+    image: nginx
+    depends_on: 
+      - wordpress
+    container_name: webserver
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - wordpress:/var/www/app/wordpress
+      - ./nginx_conf:/etc/nginx/conf.d
+    networks: 
+      - app-network
+
+volumes: 
+  - db_data: {}
+  - wordpress: {}
+
+networks:
+  app-network:
+    driver: bridge
